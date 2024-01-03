@@ -2,8 +2,7 @@ use base64::Engine;
 use base64::engine::{general_purpose};
 fn convert_hex_to_base64(hex: &str) -> String {
     let decoded = hex::decode(hex).unwrap();
-    let base64 = general_purpose::STANDARD_NO_PAD.encode(decoded);
-    return base64
+    general_purpose::STANDARD_NO_PAD.encode(decoded)
 }
 
 #[test]
