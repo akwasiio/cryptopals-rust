@@ -1,9 +1,7 @@
-use crate::set_1::fixed_xor::xor;
-use std::cmp::max;
 use std::collections::HashMap;
 use std::fs;
-use std::fs::File;
-use std::string::FromUtf8Error;
+
+use crate::set_1::fixed_xor::xor;
 
 /// The hex encoded string:
 ///
@@ -70,15 +68,13 @@ fn create_corpus(text: String) -> HashMap<char, f64> {
     let mut corpus_map = HashMap::new();
     for c in text.chars() {
         *corpus_map.entry(c).or_insert(0f64) += 1f64;
-        // corpus_map.insert(c, corpus_map.get(&c).or_else(|| Some(&0f64)).unwrap() + 1f64)
     }
 
     let total = text.chars().count();
-    let mut final_map = HashMap::new();
-    for key in corpus_map.keys() {
-        final_map.insert(*key, corpus_map[&key] / total as f64);
+    for val in corpus_map.values_mut() {
+        *val = *val / total as f64;
     }
-    final_map
+    corpus_map
 }
 
 #[test]
