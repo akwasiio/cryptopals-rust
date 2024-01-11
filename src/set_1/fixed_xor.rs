@@ -10,10 +10,8 @@ use base64::Engine;
 /// ... should produce:
 /// 746865206b696420646f6e277420706c6179
 
-fn xor(first: Vec<u8>, second: Vec<u8>) -> Vec<u8> {
-      first.iter().zip(second)
-        .map(|(f, s)| f ^ s)
-        .collect()
+pub fn xor(first: &Vec<u8>, second: &Vec<u8>) -> Vec<u8> {
+    first.iter().zip(second).map(|(f, s)| f ^ s).collect()
 }
 
 fn solution() -> String {
@@ -21,10 +19,8 @@ fn solution() -> String {
     let buffer2 = hex::decode("686974207468652062756c6c277320657965").unwrap();
 
     // probably need to consider making sure the buffers are of equal length
-    hex::encode(xor(buffer1, buffer2))
+    hex::encode(xor(&buffer1, &buffer2))
 }
-
-
 
 #[cfg(test)]
 mod test {
@@ -32,6 +28,9 @@ mod test {
 
     #[test]
     fn test_fixed_xor() {
-        assert_eq!(solution(), String::from("746865206b696420646f6e277420706c6179"));
+        assert_eq!(
+            solution(),
+            String::from("746865206b696420646f6e277420706c6179")
+        );
     }
 }
