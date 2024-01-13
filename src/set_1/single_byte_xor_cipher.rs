@@ -53,7 +53,7 @@ fn solution() -> String {
     best_xor_res
 }
 
-fn get_score_of_english_chars(text: String, corpus: &HashMap<char, f64>) -> f64 {
+pub fn get_score_of_english_chars(text: String, corpus: &HashMap<char, f64>) -> f64 {
     let mut score = 0.0f64;
     for c in text.chars() {
         if let Some(freq) = corpus.get(&c) {
@@ -64,7 +64,7 @@ fn get_score_of_english_chars(text: String, corpus: &HashMap<char, f64>) -> f64 
     return score / text.chars().count() as f64;
 }
 
-fn create_corpus(text: String) -> HashMap<char, f64> {
+pub fn create_corpus(text: String) -> HashMap<char, f64> {
     let mut corpus_map = HashMap::new();
     for c in text.chars() {
         *corpus_map.entry(c).or_insert(0f64) += 1f64;
