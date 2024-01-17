@@ -1,6 +1,7 @@
 use std::fs;
+use crate::set_1::create_corpus;
 use crate::set_1::fixed_xor::xor;
-use crate::set_1::single_byte_xor_cipher::{create_corpus, get_score_of_english_chars};
+use crate::set_1::single_byte_xor_cipher::get_score_of_english_chars;
 
 /// One of the 60-character strings in this file has been encrypted by single-character XOR.
 //

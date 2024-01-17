@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::fs;
 
 use crate::set_1::fixed_xor::xor;
+use crate::set_1::get_english_corpus;
 
 /// The hex encoded string:
 ///
@@ -13,30 +13,16 @@ use crate::set_1::fixed_xor::xor;
 /// How? Devise some method for "scoring" a piece of English plaintext.
 /// Character frequency is a good metric. Evaluate each output and choose the one with the best score.
 
-// take a brute force approach? how about we xor the byte string against every alphabet
-fn brute(cipher: Vec<u8>) {
-    for (char) in 0u8..=255 {
-        let bytes = vec![char; cipher.len()];
-
-        let xord = xor(&cipher, &bytes);
-        println!("{}", String::from_utf8(xord).unwrap())
-    }
-}
-
-fn solution() -> String {
-    let bytes: Vec<u8> =
-        hex::decode("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")
-            .unwrap();
-    let texts = fs::read_to_string("texts/pride-and-prejudice.txt").unwrap();
-    let corpus = create_corpus(texts);
+pub fn single_byte_xor(bytes: &[u8], corpus: &HashMap<char,  f64>) -> (u8, String) {
 
     // evaluate each output and choose the one with the best score (has the highest frequency of english chars)
     let mut best_score = 0.0;
     let mut best_xor_res = String::new();
+    let mut best_key: u8 = 0;
 
     for i in 0u8..=255 {
         let key_bytes = vec![i; bytes.len()];
-        let xor_res = xor(&bytes, &key_bytes);
+        let xor_res = xor(bytes, &key_bytes);
 
         match String::from_utf8(xor_res) {
             Ok(value) => {
@@ -44,13 +30,14 @@ fn solution() -> String {
                 if score > best_score {
                     best_score = score;
                     best_xor_res = value;
+                    best_key = i;
                 }
             }
             Err(_) => {}
         }
     }
 
-    best_xor_res
+    (best_key, best_xor_res)
 }
 
 pub fn get_score_of_english_chars(text: String, corpus: &HashMap<char, f64>) -> f64 {
@@ -64,20 +51,13 @@ pub fn get_score_of_english_chars(text: String, corpus: &HashMap<char, f64>) -> 
     return score / text.chars().count() as f64;
 }
 
-pub fn create_corpus(text: String) -> HashMap<char, f64> {
-    let mut corpus_map = HashMap::new();
-    for c in text.chars() {
-        *corpus_map.entry(c).or_insert(0f64) += 1f64;
-    }
-
-    let total = text.chars().count();
-    for val in corpus_map.values_mut() {
-        *val = *val / total as f64;
-    }
-    corpus_map
-}
 
 #[test]
 fn test() {
-    assert_eq!(solution(), "Cooking MC's like a pound of bacon")
+   let corpus= get_english_corpus();
+
+    let bytes: Vec<u8> =
+        hex::decode("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")
+            .unwrap();
+    assert_eq!(single_byte_xor(&bytes, &corpus).1, "Cooking MC's like a pound of bacon")
 }

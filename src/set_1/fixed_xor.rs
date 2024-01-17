@@ -10,7 +10,7 @@ use base64::Engine;
 /// ... should produce:
 /// 746865206b696420646f6e277420706c6179
 
-pub fn xor(first: &Vec<u8>, second: &Vec<u8>) -> Vec<u8> {
+pub fn xor(first: &[u8], second: &[u8]) -> Vec<u8> {
     first.iter().zip(second).map(|(f, s)| f ^ s).collect()
 }
 
