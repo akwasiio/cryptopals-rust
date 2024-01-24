@@ -5,7 +5,6 @@ use aes::cipher::{BlockDecrypt, KeyInit};
 use aes::cipher::consts::U16;
 use aes::cipher::generic_array::GenericArray;
 use base64::Engine;
-use data_encoding::BASE64_MIME;
 
 fn challenge_7(key_stream: &[u8], text_stream: &[u8]) -> String {
     let key = GenericArray::from_slice(key_stream);
