@@ -1,10 +1,9 @@
-
 #[cfg(test)]
 mod set1_tests {
-    use std::fs;
-    use base64::Engine;
-    use base64::engine::general_purpose;
     use crate::set_1::*;
+    use base64::engine::general_purpose;
+    use base64::Engine;
+    use std::fs;
 
     #[test]
     fn test_hex_to_base64() {
@@ -32,12 +31,15 @@ mod set1_tests {
 
     #[test]
     fn test_single_byte_xor() {
-        let corpus= get_english_corpus();
+        let corpus = get_english_corpus();
 
         let bytes: Vec<u8> =
             hex::decode("1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")
                 .unwrap();
-        assert_eq!(single_byte_xor(&bytes, &corpus).1, "Cooking MC's like a pound of bacon")
+        assert_eq!(
+            single_byte_xor(&bytes, &corpus).1,
+            "Cooking MC's like a pound of bacon"
+        )
     }
 
     #[test]
@@ -48,7 +50,8 @@ mod set1_tests {
     #[test]
     fn test_repeating_key_xor() {
         let text_stream = "Burning 'em, if you ain't quick and nimble
-I go crazy when I hear a cymbal".as_bytes();
+I go crazy when I hear a cymbal"
+            .as_bytes();
         let key_stream = "ICE".as_bytes();
         let res = "0b3637272a2b2e63622c2e69692a23693a2a3c6324202d623d63343c2a26226324272765272a282b2f20430a652e2c652a3124333a653e2b2027630c692b20283165286326302e27282f";
         assert_eq!(repeating_key_xor(text_stream, key_stream), res);
@@ -67,16 +70,20 @@ I go crazy when I hear a cymbal".as_bytes();
     #[test]
     fn test_aes_ecb_mode() {
         let f = fs::read_to_string("texts/7.txt")
-            .and_then(|s| Ok(s.replace("\n", "")))
+            .map(|s| s.replace('\n', ""))
             .unwrap();
 
-        let bytes = base64::engine::general_purpose::STANDARD_NO_PAD.decode(f).unwrap();
+        let bytes = base64::engine::general_purpose::STANDARD_NO_PAD
+            .decode(f)
+            .unwrap();
         let key_stream = "YELLOW SUBMARINE".as_bytes();
 
         let expected: String = fs::read_to_string("texts/7-answer.txt").unwrap();
-        let actual = decrypt_aes_ecb(key_stream, &bytes);
+        let actual = String::from_utf8(decrypt_aes_ecb(key_stream, &bytes)).unwrap();
 
-        expected.lines().zip(actual.lines())
+        expected
+            .lines()
+            .zip(actual.lines())
             .for_each(|(e, a)| assert_eq!(e.trim(), a.trim()));
     }
 

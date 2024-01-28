@@ -28,16 +28,13 @@ pub fn single_byte_xor(bytes: &[u8], corpus: &HashMap<char,  f64>) -> (u8, Strin
         let key_bytes = vec![i; bytes.len()];
         let xor_res = fixed_xor(bytes, &key_bytes);
 
-        match String::from_utf8(xor_res) {
-            Ok(value) => {
-                let score = get_score_of_english_chars(value.clone(), &corpus);
-                if score > best_score {
-                    best_score = score;
-                    best_xor_res = value;
-                    best_key = i;
-                }
+        if let Ok(value) = String::from_utf8(xor_res) {
+            let score = get_score_of_english_chars(value.clone(), corpus);
+            if score > best_score {
+                best_score = score;
+                best_xor_res = value;
+                best_key = i;
             }
-            Err(_) => {}
         }
     }
 
@@ -95,7 +92,7 @@ pub fn break_repeating_key_xor(bytes: &[u8]) -> Key {
         let mut s = 0.0;
         for i in 0..b.len() {
             for j in i..b.len() {
-                s += hamming_distance(&b[i], &b[j]) as f64
+                s += hamming_distance(b[i], b[j]) as f64
             }
         }
         let avg_distance = (s / (k as f64)) / 6f64;
@@ -111,10 +108,10 @@ pub fn break_repeating_key_xor(bytes: &[u8]) -> Key {
     let mut res = vec![];
     let corpus = get_english_corpus();
 
-    for i in 0..blocks.len() {
+    (0..blocks.len()).for_each(|i| {
         let sres = single_byte_xor(&blocks[i], &corpus);
         res.push(sres.0);
-    }
+    });
     let s = repeating_key_xor(&bytes, &res);
     println!("{:?}", String::from_utf8(hex::decode(s).unwrap()));
 
@@ -123,19 +120,17 @@ pub fn break_repeating_key_xor(bytes: &[u8]) -> Key {
 
 
 
-pub fn decrypt_aes_ecb(key_stream: &[u8], text_stream: &[u8]) -> String {
+pub fn decrypt_aes_ecb(key_stream: &[u8], text_stream: &[u8]) -> Vec<u8> {
     let key = GenericArray::from_slice(key_stream);
-    let cipher = Aes128::new(&key);
+    let cipher = Aes128::new(key);
 
     let mut v: Vec<GenericArray<u8, U16>> = text_stream.chunks(16)
-        .map(|x|  GenericArray::clone_from_slice(x) )
+        .map(GenericArray::clone_from_slice)
         .collect();
 
     cipher.decrypt_blocks(&mut v);
 
-    let res: Vec<u8> = v.iter().flatten().map(|&x| x).collect();
-    // println!("{}", String::from_utf8(res).unwrap());
-    String::from_utf8(res).unwrap()
+    v.into_iter().flatten().collect()
 }
 
 
@@ -143,7 +138,7 @@ fn detect_ecb() -> Option<String> {
     let mut res = None;
     let f = fs::read_to_string("texts/8.txt").unwrap();
 
-    for (i, line) in f.lines().enumerate() {
+    for (_i, line) in f.lines().enumerate() {
         let decoded = hex::decode(line).unwrap();
         let chunked: Vec<_> = decoded.chunks(16).collect();
         let set: HashSet<_> = HashSet::from_iter(&chunked);
