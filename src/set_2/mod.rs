@@ -4,7 +4,7 @@ use aes::{
     cipher::{generic_array::GenericArray, typenum::U16, BlockEncrypt, KeyInit},
     Aes128,
 };
-use std::{collections::HashSet, iter};
+use std::iter;
 
 use crate::set_1::{decrypt_aes_ecb, fixed_xor};
 
