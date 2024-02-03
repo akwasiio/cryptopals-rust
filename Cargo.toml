@@ -9,3 +9,4 @@ edition = "2021"
 base64 = "0.21.5"
 hex = "0.4.3"
 aes = "0.8.3"
+rand = {version = "0.8.4", features = ["small_rng"]}
