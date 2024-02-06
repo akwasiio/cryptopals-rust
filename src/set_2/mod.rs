@@ -2,12 +2,19 @@
 
 mod tests;
 
-use std::{collections::HashSet, iter};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    io::{self, stdout, Read, Stdout, Write},
+    iter, thread,
+    time::Duration,
+};
 
 use aes::{
+    cipher::{generic_array::GenericArray, BlockEncrypt, KeyInit},
     Aes128,
-    cipher::{BlockEncrypt, generic_array::GenericArray, KeyInit},
 };
+use base64::{engine::general_purpose, Engine};
 use rand::prelude::*;
 
 use crate::set_1::{decrypt_aes_ecb, fixed_xor};
@@ -46,7 +53,6 @@ fn cbc_encryption(key_stream: &[u8], plain_text: &[u8], init_vector: &[u8]) -> V
 
 fn cbc_decryption(key_stream: &[u8], cipher: &[u8], init_vector: &[u8]) -> Vec<u8> {
     let mut res = Vec::new();
-
 
     let chunked: Vec<&[u8]> = cipher.chunks(16).collect();
 
@@ -101,12 +107,7 @@ fn encryption_oracle(plain_text: &[u8]) -> (Vec<u8>, EncryptionType) {
     rng.fill_bytes(&mut before);
     rng.fill_bytes(&mut after);
 
-    let res = [
-        &before[..pad_size],
-        plain_text,
-        &after[..pad_size],
-    ]
-        .concat();
+    let res = [&before[..pad_size], plain_text, &after[..pad_size]].concat();
 
     let padded = pkcs7_padding(&res, 16);
     if rng.gen() {
@@ -123,7 +124,7 @@ fn encryption_oracle(plain_text: &[u8]) -> (Vec<u8>, EncryptionType) {
 }
 
 fn detect_block_cipher_mode(cipher: &[u8]) -> EncryptionType {
-    if is_ecb(&cipher) {
+    if is_ecb(cipher) {
         EncryptionType::Ecb
     } else {
         EncryptionType::Cbc
@@ -135,6 +136,93 @@ fn is_ecb(cipher: &[u8]) -> bool {
     let set: HashSet<_> = HashSet::from_iter(&chunked);
 
     chunked.len() != set.len()
+}
+
+fn byte_at_a_time_ecb_detection() -> String {
+    let mut key = [0u8; 16];
+    let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
+    rng.fill_bytes(&mut key);
+
+    let (cipher_len, block_size) = get_block_size(&key);
+    let blocks = cipher_len / block_size;
+
+    if is_ecb(&ecb_oracle(&key, &vec![0; block_size * block_size])) {
+        let mut plain_text = vec![];
+        for block in 0 .. blocks {
+          for i in 1..= block_size {
+              let f = build_codebook(block_size, &key, &plain_text);
+              let b = vec![0; block_size - i];
+              let start = block * block_size;
+              let end = start + block_size;
+
+              let oracle_res = ecb_oracle(&key, &b);
+              let s: String = oracle_res[start .. end]
+                  .iter()
+                  .map(|b| *b as char)
+                  .collect();
+
+              if let Some(res) = f.get(&s) {
+                  plain_text.push(*res);
+                  // print!("{}", *res as char);
+                  // io::stdout().flush().unwrap();
+              }
+          }
+        }
+        let s = String::from_utf8(plain_text).unwrap();
+        println!("{}", &s);
+        s
+    } else {
+        "Not ECB".to_string()
+    }
+}
+
+fn get_block_size(key: &[u8]) -> (usize, usize) {
+    let init = [0u8; 1];
+    let initial_len = ecb_oracle(key, &init).len();
+
+    let mut block_size = 0;
+    for i in 2..=100 {
+        let s = vec![0; i];
+        let cipher_len = ecb_oracle(key, &s).len();
+
+        block_size = cipher_len - initial_len;
+
+        if block_size != 0 {
+            break;
+        }
+    }
+
+    println!("Block Size: {}\nInitial len: {}\n\n", block_size, initial_len);
+
+    (initial_len, block_size)
+}
+
+fn ecb_oracle(key: &[u8], plain_text: &[u8]) -> Vec<u8> {
+    let s = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK";
+    let decoded = general_purpose::STANDARD.decode(s).unwrap();
+    let plain_text = [plain_text, &decoded].concat();
+    let padded = pkcs7_padding(&plain_text, 16);
+    encrypt_aes_ecb(key, &padded)
+}
+
+fn build_codebook(block_size: usize, key: &[u8], plain_text: &[u8]) -> HashMap<String, u8> {
+    let mut map = HashMap::new();
+    let p = vec![0u8; block_size];
+    let p = [&p, plain_text, &[0u8]].concat();
+    let mut p = p[p.len() - block_size..].to_vec();
+
+    for i in 0u8..=255 {
+        p[block_size - 1] = i;
+        let oracle_res = ecb_oracle(key, &p);
+        let s: String = oracle_res
+            .into_iter()
+            .take(block_size)
+            .map(|b| b as char)
+            .collect();
+        map.insert(s, i);
+    }
+
+    map
 }
 
 

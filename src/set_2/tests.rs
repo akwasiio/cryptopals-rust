@@ -7,7 +7,7 @@ mod set_2_tests {
     use base64::{Engine, engine::general_purpose};
 
     use crate::
-    set_2::{cbc_decryption, pkcs7_padding}
+    set_2::{byte_at_a_time_ecb_detection, cbc_decryption, pkcs7_padding}
     ;
     use crate::set_1::decrypt_aes_ecb;
 
@@ -90,5 +90,10 @@ Play that funky music";
 
         println!("Oracle encryption: {:?}\nDetection Result: {:?}", oracle_encryption, detection_res);
         assert_eq!(oracle_encryption, detection_res)
+    }
+
+    #[test]
+    fn test_block_size() {
+        assert!(byte_at_a_time_ecb_detection().contains("The girlies on standby waving just to say hi"))
     }
 }
