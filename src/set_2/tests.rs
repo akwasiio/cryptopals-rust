@@ -2,12 +2,13 @@ use crate::set_2::{detect_block_cipher_mode, encrypt_aes_ecb, encryption_oracle}
 
 #[cfg(test)]
 mod set_2_tests {
+    use std::collections::HashMap;
     use std::fs;
 
     use base64::{Engine, engine::general_purpose};
 
     use crate::
-    set_2::{byte_at_a_time_ecb_detection, cbc_decryption, pkcs7_padding}
+    set_2::{byte_at_a_time_ecb_detection, cbc_decryption, ecb_cut_and_paste, parser, pkcs7_padding, profile_for}
     ;
     use crate::set_1::decrypt_aes_ecb;
 
@@ -95,5 +96,41 @@ Play that funky music";
     #[test]
     fn test_block_size() {
         assert!(byte_at_a_time_ecb_detection().contains("The girlies on standby waving just to say hi"))
+    }
+
+    #[test]
+    fn test_parser() {
+        let s = "foo=bar&baz=qux&zap=zazzle";
+        let m = HashMap::from([
+            ("foo".to_string(), "bar".to_string()),
+            ("baz".to_string(), "qux".to_string()),
+            ("zap".to_string(), "zazzle".to_string()),
+        ]);
+        let res = parser(s);
+
+        let mut res_keys: Vec<&String> = res.keys().collect();
+        res_keys.sort();
+        let mut expected_keys: Vec<&String> = m.keys().collect();
+        expected_keys.sort();
+
+        let mut res_vals: Vec<&String> = res.values().collect();
+        res_vals.sort();
+        let mut expected_vals: Vec<&String> = m.values().collect();
+        expected_vals.sort();
+
+        assert_eq!(res_keys, expected_keys);
+        assert_eq!(expected_vals, res_vals)
+    }
+
+    #[test]
+    fn test_profile_for() {
+        let expected = "email=foo@bar.com&uid=10&role=user";
+        let actual = profile_for("foo@bar.com");
+        assert_eq!(expected, actual)
+    }
+
+    #[test]
+    fn test_is_admin() {
+      assert!(ecb_cut_and_paste())
     }
 }

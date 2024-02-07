@@ -4,10 +4,7 @@ mod tests;
 
 use std::{
     collections::{HashMap, HashSet},
-    fs,
-    io::{self, stdout, Read, Stdout, Write},
-    iter, thread,
-    time::Duration,
+    iter,
 };
 
 use aes::{
@@ -148,25 +145,22 @@ fn byte_at_a_time_ecb_detection() -> String {
 
     if is_ecb(&ecb_oracle(&key, &vec![0; block_size * block_size])) {
         let mut plain_text = vec![];
-        for block in 0 .. blocks {
-          for i in 1..= block_size {
-              let f = build_codebook(block_size, &key, &plain_text);
-              let b = vec![0; block_size - i];
-              let start = block * block_size;
-              let end = start + block_size;
+        for block in 0..blocks {
+            for i in 1..=block_size {
+                let f = build_codebook(block_size, &key, &plain_text);
+                let b = vec![0; block_size - i];
+                let start = block * block_size;
+                let end = start + block_size;
 
-              let oracle_res = ecb_oracle(&key, &b);
-              let s: String = oracle_res[start .. end]
-                  .iter()
-                  .map(|b| *b as char)
-                  .collect();
+                let oracle_res = ecb_oracle(&key, &b);
+                let s: String = oracle_res[start..end].iter().map(|b| *b as char).collect();
 
-              if let Some(res) = f.get(&s) {
-                  plain_text.push(*res);
-                  // print!("{}", *res as char);
-                  // io::stdout().flush().unwrap();
-              }
-          }
+                if let Some(res) = f.get(&s) {
+                    plain_text.push(*res);
+                    // print!("{}", *res as char);
+                    // io::stdout().flush().unwrap();
+                }
+            }
         }
         let s = String::from_utf8(plain_text).unwrap();
         println!("{}", &s);
@@ -192,7 +186,10 @@ fn get_block_size(key: &[u8]) -> (usize, usize) {
         }
     }
 
-    println!("Block Size: {}\nInitial len: {}\n\n", block_size, initial_len);
+    println!(
+        "Block Size: {}\nInitial len: {}\n\n",
+        block_size, initial_len
+    );
 
     (initial_len, block_size)
 }
@@ -224,5 +221,63 @@ fn build_codebook(block_size: usize, key: &[u8], plain_text: &[u8]) -> HashMap<S
 
     map
 }
+
+fn parser(string: &str) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    let s: Vec<&str> = string.split(|c: char| c.is_ascii_punctuation()).collect();
+
+    for i in (0..s.len()).step_by(2) {
+        let key = s.get(i).unwrap();
+        let v = s.get(i + 1).unwrap();
+        map.insert(key.to_string(), v.to_string());
+    }
+
+    map
+}
+
+fn profile_for(email: &str) -> String {
+    if email.contains('=') || email.contains('&') {
+        panic!("You want to hack the system!")
+    }
+
+    format!("email={}&uid=10&role=user", email)
+}
+
+pub(crate) fn ecb_cut_and_paste() -> bool {
+  let key = generate_random_aes_key();
+
+  // email=foooo@bar.|com&uid=10&role=|user{padding}
+  let email = "foooo@bar.com"; // this will make sure user starts it's own block so we can easily cut it out.
+
+  let user_profile = profile_for(email);
+  let padded_user_p = pkcs7_padding(user_profile.as_bytes(), 16);
+  let encrypted_user_p = encrypt_aes_ecb(&key, &padded_user_p);
+  let first_two_blocks = &encrypted_user_p[..32];
+
+  // admin string has to be it's own block so we have to pad
+  let padded_admin_string = String::from_utf8(pkcs7_padding(b"admin", 16)).unwrap();
+  let admin_email = format!("foooo@bar.{}", padded_admin_string);
+
+  let admin_prof = profile_for(&admin_email);
+  let padded_admin_prof = pkcs7_padding(admin_prof.as_bytes(), 16);
+  let encrypted_admin_prof = encrypt_aes_ecb(&key, &padded_admin_prof);
+
+  // grab the second block cos that would have the admin encryption.
+  let admin_block = &encrypted_admin_prof[16 .. 32];
+  let res = [first_two_blocks, admin_block].concat();
+
+  let s = decrypt_aes_ecb(&key, &res);
+  let s = String::from_utf8(s).unwrap();
+  let s = s.trim();
+  println!("User Profile: {}\nHacked Admin Profile: {}" , user_profile,  &s);
+
+  let map = parser(s);
+  if let Some(role) = map.get("role")  {
+    role == "admin"
+  } else {
+    false
+  }
+}
+
 
 
