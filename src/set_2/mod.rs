@@ -4,6 +4,7 @@ mod tests;
 
 use std::{
     collections::{HashMap, HashSet},
+    io::Read,
     iter,
 };
 
@@ -244,40 +245,68 @@ fn profile_for(email: &str) -> String {
 }
 
 pub(crate) fn ecb_cut_and_paste() -> bool {
-  let key = generate_random_aes_key();
+    let key = generate_random_aes_key();
 
-  // email=foooo@bar.|com&uid=10&role=|user{padding}
-  let email = "foooo@bar.com"; // this will make sure user starts it's own block so we can easily cut it out.
+    // email=foooo@bar.|com&uid=10&role=|user{padding}
+    let email = "foooo@bar.com"; // this will make sure user starts it's own block so we can easily cut it out.
 
-  let user_profile = profile_for(email);
-  let padded_user_p = pkcs7_padding(user_profile.as_bytes(), 16);
-  let encrypted_user_p = encrypt_aes_ecb(&key, &padded_user_p);
-  let first_two_blocks = &encrypted_user_p[..32];
+    let user_profile = profile_for(email);
+    let padded_user_p = pkcs7_padding(user_profile.as_bytes(), 16);
+    let encrypted_user_p = encrypt_aes_ecb(&key, &padded_user_p);
+    let first_two_blocks = &encrypted_user_p[..32];
 
-  // admin string has to be it's own block so we have to pad
-  let padded_admin_string = String::from_utf8(pkcs7_padding(b"admin", 16)).unwrap();
-  let admin_email = format!("foooo@bar.{}", padded_admin_string);
+    // admin string has to be it's own block so we have to pad
+    let padded_admin_string = String::from_utf8(pkcs7_padding(b"admin", 16)).unwrap();
+    let admin_email = format!("foooo@bar.{}", padded_admin_string);
 
-  let admin_prof = profile_for(&admin_email);
-  let padded_admin_prof = pkcs7_padding(admin_prof.as_bytes(), 16);
-  let encrypted_admin_prof = encrypt_aes_ecb(&key, &padded_admin_prof);
+    let admin_prof = profile_for(&admin_email);
+    let padded_admin_prof = pkcs7_padding(admin_prof.as_bytes(), 16);
+    let encrypted_admin_prof = encrypt_aes_ecb(&key, &padded_admin_prof);
 
-  // grab the second block cos that would have the admin encryption.
-  let admin_block = &encrypted_admin_prof[16 .. 32];
-  let res = [first_two_blocks, admin_block].concat();
+    // grab the second block cos that would have the admin encryption.
+    let admin_block = &encrypted_admin_prof[16..32];
+    let res = [first_two_blocks, admin_block].concat();
 
-  let s = decrypt_aes_ecb(&key, &res);
-  let s = String::from_utf8(s).unwrap();
-  let s = s.trim();
-  println!("User Profile: {}\nHacked Admin Profile: {}" , user_profile,  &s);
+    let s = decrypt_aes_ecb(&key, &res);
+    let s = String::from_utf8(s).unwrap();
+    let s = s.trim();
+    println!(
+        "User Profile: {}\nHacked Admin Profile: {}",
+        user_profile, &s
+    );
 
-  let map = parser(s);
-  if let Some(role) = map.get("role")  {
-    role == "admin"
-  } else {
-    false
-  }
+    let map = parser(s);
+    if let Some(role) = map.get("role") {
+        role == "admin"
+    } else {
+        false
+    }
 }
 
+fn has_padding(plain_text: &[u8]) -> bool {
+    let last_byte = *plain_text.last().unwrap() as usize;
+    let mut p: Vec<u8> = plain_text.iter().copied().collect();
+    p.reverse();
 
+    for _i in 0..last_byte {
+        if (p[0] as usize) == last_byte {
+            p.remove(0);
+        }
+    }
 
+    (p.len() + last_byte) % 16 == 0
+}
+
+fn strip_padding(plain_text: &[u8]) -> Vec<u8> {
+    if !has_padding(plain_text) {
+        panic!("Plain text has invalid PKCS#7 padding applied")
+    }
+
+    let last_byte = *plain_text.last().unwrap() as usize;
+
+    plain_text
+        .iter()
+        .copied()
+        .take(plain_text.len() - last_byte)
+        .collect()
+}

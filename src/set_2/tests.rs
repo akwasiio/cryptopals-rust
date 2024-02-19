@@ -5,12 +5,13 @@ mod set_2_tests {
     use std::collections::HashMap;
     use std::fs;
 
-    use base64::{Engine, engine::general_purpose};
+    use base64::{engine::general_purpose, Engine};
 
-    use crate::
-    set_2::{byte_at_a_time_ecb_detection, cbc_decryption, ecb_cut_and_paste, parser, pkcs7_padding, profile_for}
-    ;
     use crate::set_1::decrypt_aes_ecb;
+    use crate::set_2::{
+        byte_at_a_time_ecb_detection, cbc_decryption, ecb_cut_and_paste, has_padding, parser,
+        pkcs7_padding, profile_for, strip_padding,
+    };
 
     use super::{detect_block_cipher_mode, encrypt_aes_ecb, encryption_oracle};
 
@@ -68,7 +69,6 @@ mod set_2_tests {
         assert_eq!(*res_lines.last().unwrap(), last_line);
     }
 
-
     #[test]
     fn test_oracle_detection() {
         let text = "Say -- Play that funky music Say, go white boy, go white boy go
@@ -89,13 +89,18 @@ Play that funky music";
         let (cipher, oracle_encryption) = encryption_oracle(text.as_bytes());
         let detection_res = detect_block_cipher_mode(&cipher);
 
-        println!("Oracle encryption: {:?}\nDetection Result: {:?}", oracle_encryption, detection_res);
+        println!(
+            "Oracle encryption: {:?}\nDetection Result: {:?}",
+            oracle_encryption, detection_res
+        );
         assert_eq!(oracle_encryption, detection_res)
     }
 
     #[test]
     fn test_block_size() {
-        assert!(byte_at_a_time_ecb_detection().contains("The girlies on standby waving just to say hi"))
+        assert!(
+            byte_at_a_time_ecb_detection().contains("The girlies on standby waving just to say hi")
+        )
     }
 
     #[test]
@@ -131,6 +136,34 @@ Play that funky music";
 
     #[test]
     fn test_is_admin() {
-      assert!(ecb_cut_and_paste())
+        assert!(ecb_cut_and_paste())
+    }
+
+    #[test]
+    fn test_has_valid_padding() {
+        let s = "ICE ICE BABY\x04\x04\x04\x04";
+        assert!(has_padding(s.as_bytes()));
+
+        let s = "ICE ICE BABY\x05\x05\x05\x05";
+        assert!(!has_padding(s.as_bytes()));
+
+        let s = "ICE ICE BABY\x01\x02\x03\x04";
+        assert!(!has_padding(s.as_bytes()))
+    }
+
+    #[test]
+    fn test_strip_valid_padding() {
+        let s = "ICE ICE BABY\x04\x04\x04\x04";
+        let expected = "ICE ICE BABY".as_bytes();
+
+        let actual = strip_padding(s.as_bytes());
+        assert_eq!(expected, actual.as_slice())
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_try_strip_invalid_padding() {
+        let s = "ICE ICE BABY\x01\x02\x03\x04";
+        strip_padding(s.as_bytes());
     }
 }
