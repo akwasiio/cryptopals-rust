@@ -4,7 +4,6 @@ mod tests;
 
 use std::{
     collections::{HashMap, HashSet},
-    io::Read,
     iter,
 };
 
@@ -310,3 +309,55 @@ fn strip_padding(plain_text: &[u8]) -> Vec<u8> {
         .take(plain_text.len() - last_byte)
         .collect()
 }
+
+struct CbcEncryptionOracle {
+    key: [u8; 16],
+    iv: [u8; 16],
+}
+
+impl CbcEncryptionOracle {
+    pub fn new() -> Self {
+        let mut rng = thread_rng();
+        CbcEncryptionOracle {
+            key: rng.gen(),
+            iv: rng.gen(),
+        }
+    }
+
+    pub fn encrypt(&self, payload: &str) -> Vec<u8> {
+        let text = payload.replace([';', '='], "_");
+
+        let s = format!(
+            "{}{}{}",
+            "comment1=cooking%20MCs;userdata=", text, ";comment2=%20like%20a%20pound%20of%20bacon"
+        );
+
+        cbc_encryption(&self.key, s.as_bytes(), &self.iv)
+    }
+}
+
+struct CbcAttacker;
+
+impl CbcAttacker {
+    pub fn make_admin(&self, oracle: &CbcEncryptionOracle) -> Vec<u8> {
+        let payload = "AAAAA:admin<true";
+        let cipher = oracle.encrypt(payload);
+        let mut cipher_blocks: Vec<_> = cipher.chunks(16).map(|chunk| chunk.to_vec()).collect();
+        // println!("Cipher blocks before: {:?}", &cipher_blocks);
+        let target_block = cipher_blocks.get_mut(1).unwrap();
+        println!("Target block before: {:?}", &target_block);
+        target_block[5] ^= 1;
+        target_block[11] ^= 1;
+
+        cipher_blocks.concat()
+    }
+
+    pub fn check_is_admin(&self, oracle: &CbcEncryptionOracle, cipher: &[u8]) -> bool {
+        let decrypted = cbc_decryption(&oracle.key, cipher, &oracle.iv);
+        let p: String = decrypted.into_iter().map(|c| c as char).collect();
+
+        p.contains(";admin=true;")
+    }
+}
+
+

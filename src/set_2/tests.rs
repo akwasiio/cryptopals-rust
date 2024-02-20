@@ -9,8 +9,7 @@ mod set_2_tests {
 
     use crate::set_1::decrypt_aes_ecb;
     use crate::set_2::{
-        byte_at_a_time_ecb_detection, cbc_decryption, ecb_cut_and_paste, has_padding, parser,
-        pkcs7_padding, profile_for, strip_padding,
+        byte_at_a_time_ecb_detection, cbc_decryption, ecb_cut_and_paste, has_padding, parser, pkcs7_padding, profile_for, strip_padding, CbcAttacker, CbcEncryptionOracle
     };
 
     use super::{detect_block_cipher_mode, encrypt_aes_ecb, encryption_oracle};
@@ -165,5 +164,14 @@ Play that funky music";
     fn test_try_strip_invalid_padding() {
         let s = "ICE ICE BABY\x01\x02\x03\x04";
         strip_padding(s.as_bytes());
+    }
+
+
+    #[test]
+    fn test_attacker() {
+        let oracle = CbcEncryptionOracle::new();
+        let attacker = CbcAttacker;
+        let encrypted = attacker.make_admin(&oracle);
+        assert!(attacker.check_is_admin(&oracle, &encrypted))
     }
 }
