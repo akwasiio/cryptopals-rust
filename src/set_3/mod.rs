@@ -113,3 +113,66 @@ impl PaddingOracleAttacker {
         s
     }
 }
+
+pub fn ctr_mode_encryption(nonce: &[u8], plain_text: &[u8]) -> Vec<u8> {
+    let key = "YELLOW SUBMARINE".as_bytes();
+    let mut keystream = vec![vec![]];
+    let res: Vec<Vec<_>> = plain_text
+        .chunks(16)
+        .zip(0..(plain_text.len() / 16))
+        .map(|(chunk, counter)| {
+            let counter: [u8; 8] = u64::to_le_bytes(counter as u64);
+            let comb = [nonce, &counter].concat();
+            let enc_res = encrypt_aes_ecb(key, &comb);
+            keystream.push(enc_res.clone());
+
+            fixed_xor(&enc_res, chunk)
+        })
+        .collect();
+
+    println!("Key stream, encryption: {:?}", &keystream);
+    res.concat()
+}
+
+pub fn ctr_mode_decryption(nonce: &[u8], cipher_text: &[u8]) -> Vec<u8> {
+    let key = "YELLOW SUBMARINE".as_bytes();
+
+    let iter = cipher_text.chunks_exact(16);
+    let mut count = 0;
+    let mut res = vec![vec![]];
+    for chunk in iter.clone().into_iter() {
+        let counter = u64::to_le_bytes(count as u64);
+        let comb = [nonce, &counter].concat();
+        let enc_res = encrypt_aes_ecb(key, &comb);
+        let xor_res = fixed_xor(chunk, &enc_res);
+        println!("Xor Res: {:?}", String::from_utf8(xor_res.clone()).unwrap());
+        res.push(xor_res);
+        count += 1;
+    }
+
+    if !iter.remainder().is_empty() {
+        let counter = u64::to_le_bytes(count as u64);
+        let comb = [nonce, &counter].concat();
+        let enc_res = encrypt_aes_ecb(key, &comb);
+        let xor_res = fixed_xor(iter.remainder(), &enc_res);
+        println!("Xor Res: {:?}", String::from_utf8(xor_res.clone()).unwrap());
+        res.push(xor_res);
+    }
+
+    res.concat()
+    // println!("Len cipher: {}\nLen output: {}", cipher_text.len(), res.len());
+    // println!("Res: {}", res)
+}
+
+#[test]
+fn test_ctr_mode() {
+    let s = "L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==";
+    let decoded = general_purpose::STANDARD.decode(s).unwrap();
+    let nonce: [u8; 8] = [0; 8];
+
+    // let res = ctr_mode_encryption(&nonce, &decoded);
+    let decrypted = ctr_mode_decryption(&nonce, &decoded);
+    let s = String::from_utf8(decrypted).unwrap();
+    let expected = "Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby";
+    assert_eq!(expected, s.trim())
+}
