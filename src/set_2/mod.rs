@@ -30,7 +30,7 @@ pub fn pkcs7_padding(plain_text: &[u8], block_size: usize) -> Vec<u8> {
     v
 }
 
-fn cbc_encryption(key_stream: &[u8], plain_text: &[u8], init_vector: &[u8]) -> Vec<u8> {
+pub fn cbc_encryption(key_stream: &[u8], plain_text: &[u8], init_vector: &[u8]) -> Vec<u8> {
     let mut cipher = Vec::new();
     let init_vector = init_vector.to_vec();
 
@@ -48,11 +48,9 @@ fn cbc_encryption(key_stream: &[u8], plain_text: &[u8], init_vector: &[u8]) -> V
     cipher.into_iter().flatten().collect()
 }
 
-fn cbc_decryption(key_stream: &[u8], cipher: &[u8], init_vector: &[u8]) -> Vec<u8> {
+pub fn cbc_decryption(key_stream: &[u8], cipher: &[u8], init_vector: &[u8]) -> Vec<u8> {
     let mut res = Vec::new();
-
     let chunked: Vec<&[u8]> = cipher.chunks(16).collect();
-
     chunked
         .iter()
         .enumerate()
@@ -64,15 +62,14 @@ fn cbc_decryption(key_stream: &[u8], cipher: &[u8], init_vector: &[u8]) -> Vec<u
             };
 
             let decrypted = decrypt_aes_ecb(key_stream, cipher_chunk);
-
             let xor = fixed_xor(&decrypted, last);
             res.push(xor);
         });
 
-    let padding_len = *res.last().unwrap().last().unwrap() as usize;
+    // let padding_len = *res.last().unwrap().last().unwrap() as usize;
     res.into_iter()
         .flatten()
-        .take(cipher.len() - padding_len)
+        // .take(cipher.len() - padding_len)
         .collect()
 }
 
@@ -282,18 +279,17 @@ pub(crate) fn ecb_cut_and_paste() -> bool {
     }
 }
 
-fn has_padding(plain_text: &[u8]) -> bool {
+pub fn has_padding(plain_text: &[u8]) -> bool {
     let last_byte = *plain_text.last().unwrap() as usize;
-    let mut p: Vec<u8> = plain_text.iter().copied().collect();
-    p.reverse();
+    if plain_text.len() < last_byte || last_byte <= 0 { return  false }
 
-    for _i in 0..last_byte {
-        if (p[0] as usize) == last_byte {
-            p.remove(0);
-        }
+    let rem = plain_text.len() - last_byte;
+
+    for b in &plain_text[rem..] {
+        if (*b as usize) != last_byte { return false }
     }
 
-    (p.len() + last_byte) % 16 == 0
+    true
 }
 
 fn strip_padding(plain_text: &[u8]) -> Vec<u8> {
