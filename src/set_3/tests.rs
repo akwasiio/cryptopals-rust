@@ -2,7 +2,7 @@
 pub mod set_3_tests {
     use base64::{engine::general_purpose, Engine};
 
-    use crate::set_3::{PaddingOracle, PaddingOracleAttacker};
+    use crate::set_3::{use_ctr_mode, PaddingOracle, PaddingOracleAttacker};
 
   #[test]
   fn test_padding_oracle_attack() {
@@ -35,4 +35,18 @@ pub mod set_3_tests {
     }
 
   }
+
+  #[test]
+  fn test_ctr_mode() {
+      let s = "L77na/nrFsKvynd6HzOoG7GHTLXsTVu9qvY/2syLXzhPweyyMTJULu/6/kXX0KSvoOLSFQ==";
+      let decoded = general_purpose::STANDARD.decode(s).unwrap();
+      let nonce: [u8; 8] = [0; 8];
+
+      // let res = ctr_mode_encryption(&nonce, &decoded);
+      let decrypted = use_ctr_mode(&nonce, &decoded);
+      let s = String::from_utf8(decrypted).unwrap();
+      let expected = "Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby";
+      assert_eq!(expected, s.trim())
+  }
 }
+
