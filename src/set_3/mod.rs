@@ -2,11 +2,14 @@
 
 mod tests;
 
-use crate::{set_1::fixed_xor, set_2::encrypt_aes_ecb};
+use std::fs;
+
+use crate::{set_1::{fixed_xor, single_byte_xor}, set_2::encrypt_aes_ecb, utils::{get_english_corpus, transpose}};
 use base64::{engine::general_purpose, Engine};
 use rand::{thread_rng, Rng};
 
 use crate::set_2::{cbc_decryption, cbc_encryption, has_padding};
+use crate::utils::get_uppercase_corpus;
 
 struct PaddingOracle {
     key: [u8; 16],
@@ -114,9 +117,10 @@ impl PaddingOracleAttacker {
     }
 }
 
-pub fn use_ctr_mode(nonce: &[u8], plain_text: &[u8]) -> Vec<u8> {
-    let key = "YELLOW SUBMARINE".as_bytes();
+pub fn use_ctr_mode(key: &[u8], nonce: &[u8], plain_text: &[u8]) -> Vec<u8> {
     let mut keystream = vec![vec![]];
+
+
     let res: Vec<Vec<_>> = plain_text
         .chunks(16)
         .zip(0..(plain_text.len() as f32 / 16f32).ceil() as usize)
@@ -132,3 +136,49 @@ pub fn use_ctr_mode(nonce: &[u8], plain_text: &[u8]) -> Vec<u8> {
 
     res.concat()
 }
+
+pub fn break_fixed_nonce_ctr(plain_texts: Vec<Vec<u8>>) -> String {
+    // encrypt all lines
+    let nonce = [0; 8];
+    let mut encrypted_res = vec![];
+    let mut rng = thread_rng();
+    let key: [u8; 16] = rng.gen();
+
+    for text in plain_texts {
+        let res = use_ctr_mode(&key, &nonce, &text);
+        encrypted_res.push(res)
+    }
+    let corpus = get_english_corpus();
+    let uppercase_corpus = get_uppercase_corpus();
+
+    // get keysize (max length of lines)
+    let max_len = encrypted_res.iter().min_by_key(|x| x.len()).unwrap().len();
+    let truncated: Vec<Vec<u8>> = encrypted_res.iter().map(|v| v[..max_len].to_vec()).collect();
+
+    // transpose blocks
+    let blocks = transpose(&truncated.concat(), max_len);
+
+    let mut keystream = vec![];
+
+    // get keystream using single byte xor
+    blocks.iter().enumerate().for_each(|(index, block)| {
+        let xor_res = if index == 0 {
+            single_byte_xor(block, &uppercase_corpus)
+        } else {
+            single_byte_xor(block, &corpus)
+        };
+        // println!("{}: {}", &xor_res.0, &xor_res.1);
+        keystream.push(xor_res.0);
+    });
+
+    let mut results = String::new();
+    // xor keystream with cipher to get plain text
+    for cipher in encrypted_res {
+        let res = fixed_xor(&keystream, &cipher);
+        results = format!("{}\n{}", results, String::from_utf8(res).unwrap())
+    }
+
+    results
+}
+
+
