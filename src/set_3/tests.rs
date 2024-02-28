@@ -1,9 +1,9 @@
 #[cfg(test)]
 pub mod set_3_tests {
-    use std::fs;
     use base64::{engine::general_purpose, Engine};
+    use std::fs;
 
-    use crate::set_3::{use_ctr_mode, PaddingOracle, PaddingOracleAttacker, break_fixed_nonce_ctr};
+    use crate::set_3::{break_fixed_nonce_ctr, use_ctr_mode, MersenneTwisterRNG, PaddingOracle, PaddingOracleAttacker};
 
     #[test]
     fn test_padding_oracle_attack() {
@@ -62,5 +62,24 @@ pub mod set_3_tests {
         let actual = break_fixed_nonce_ctr(decoded_res);
         assert!(actual.contains("Rakim, check this out, yo "));
     }
-}
 
+    #[test]
+    fn test_mersenne_twister_rng() {
+        let test_values = [
+            3521569528u32, 1101990581, 1076301704, 2948418163, 3792022443, 2697495705, 2002445460,
+            502890592, 3431775349, 1040222146, 3582980688, 1840389745, 4282906414, 1327318762,
+            2089338664, 4131459930, 3027134324, 2835148530, 1179416782, 1849001581, 526320344,
+            2422121673, 2517840959, 2221714477, 55000521, 591044015, 1168297933, 1971159042,
+            4039967188, 4139787488, 122076017, 2865003221, 2757324559, 1140549535, 244059003,
+            4193854726, 18931592, 4249850126, 312057759, 3675685089, 280972886, 1066277295,
+            2046947247, 2429544615, 2740628128, 2155829340, 3777224149, 1593303098, 3225103480,
+            1218072373, 721749912, 3875531970,
+        ];
+
+        let mut rng = MersenneTwisterRNG::new(Some(1131464071));
+        for expected in test_values {
+          let actual = rng.extract_number();
+          assert_eq!(expected, actual)
+        }
+    }
+}

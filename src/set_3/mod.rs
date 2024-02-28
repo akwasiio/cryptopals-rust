@@ -4,7 +4,11 @@ mod tests;
 
 use std::fs;
 
-use crate::{set_1::{fixed_xor, single_byte_xor}, set_2::encrypt_aes_ecb, utils::{get_english_corpus, transpose}};
+use crate::{
+    set_1::{fixed_xor, single_byte_xor},
+    set_2::encrypt_aes_ecb,
+    utils::{get_english_corpus, transpose},
+};
 use base64::{engine::general_purpose, Engine};
 use rand::{thread_rng, Rng};
 
@@ -120,7 +124,6 @@ impl PaddingOracleAttacker {
 pub fn use_ctr_mode(key: &[u8], nonce: &[u8], plain_text: &[u8]) -> Vec<u8> {
     let mut keystream = vec![vec![]];
 
-
     let res: Vec<Vec<_>> = plain_text
         .chunks(16)
         .zip(0..(plain_text.len() as f32 / 16f32).ceil() as usize)
@@ -153,7 +156,10 @@ pub fn break_fixed_nonce_ctr(plain_texts: Vec<Vec<u8>>) -> String {
 
     // get keysize (max length of lines)
     let max_len = encrypted_res.iter().min_by_key(|x| x.len()).unwrap().len();
-    let truncated: Vec<Vec<u8>> = encrypted_res.iter().map(|v| v[..max_len].to_vec()).collect();
+    let truncated: Vec<Vec<u8>> = encrypted_res
+        .iter()
+        .map(|v| v[..max_len].to_vec())
+        .collect();
 
     // transpose blocks
     let blocks = transpose(&truncated.concat(), max_len);
@@ -181,4 +187,95 @@ pub fn break_fixed_nonce_ctr(plain_texts: Vec<Vec<u8>>) -> String {
     results
 }
 
+struct MersenneTwisterRNG {
+    w: u8,
+    n: u16,
+    m: u16,
+    r: u8,
+    a: u32,
+    u: u8,
+    d: u32,
+    s: u8,
+    b: u32,
+    t: u8,
+    c: u32,
+    l: u8,
+    f: u32,
+    mt: [u32; 624], // 624 is the value of n
+    lower_mask: u32,
+    upper_mask: u32,
+    index: u16,
+}
 
+impl MersenneTwisterRNG {
+    pub fn new(seed: Option<u32>) -> Self {
+        let r = 31;
+        let lower_mask = (1 << r) - 1;
+        const N: u16 = 624;
+
+        let mut s = Self {
+            w: 32,
+            n: N,
+            m: 397,
+            r,
+            a: 0x9908B0DF,
+            u: 11,
+            d: 0xFFFFFFFF,
+            s: 7,
+            b: 0x9D2C5680,
+            t: 15,
+            c: 0xEFC60000,
+            l: 18,
+            f: 1812433253,
+            mt: [0; N as usize],
+            lower_mask,
+            upper_mask: !lower_mask,
+            index: N,
+        };
+
+        if let Some(value) = seed {
+            s.seed_mt(value);
+        } else {
+            s.seed_mt(5489);
+        }
+
+        s
+    }
+
+    fn seed_mt(&mut self, seed: u32) {
+        let index = self.n as usize;
+        self.mt[0] = seed;
+        for i in 1usize..index {
+            self.mt[i] = self.f.wrapping_mul(self.mt[i - 1] ^ (self.mt[i - 1] >> (self.w - 2))) + i as u32;
+        }
+    }
+
+    fn extract_number(&mut self) -> u32 {
+        if self.index >= self.n {
+            self.twist()
+        }
+
+        let mut y = self.mt[self.index as usize];
+        y = y ^ ((y >> self.u) & self.d);
+        y = y ^ ((y << self.s) & self.b);
+        y = y ^ ((y << self.t) & self.c);
+        y = y ^ (y >> self.l);
+
+        self.index += 1;
+        y
+    }
+
+    fn twist(&mut self) {
+      for i in 0 .. self.n {
+        let x = (self.mt[i as usize] & self.upper_mask) + (self.mt[((i + 1) % self.n) as usize] & self.lower_mask);
+        let mut xa = x >> 1;
+        if x % 2 != 0 {
+          xa ^= self.a;
+        }
+
+        self.mt[i as usize] = self.mt[((i + self.m) % self.n) as usize] ^ xa
+      }
+
+      self.index = 0
+    }
+}
