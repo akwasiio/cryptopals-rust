@@ -12,6 +12,10 @@ fn create_corpus(text: String) -> HashMap<char, f64> {
         *corpus_map.entry(c).or_insert(0f64) += 1f64;
     }
 
+    // for c in text.chars() {
+    //     *corpus_map.entry(c.to_uppercase().to_string().parse::<char>().unwrap()).or_insert(0f64) += 1f64;
+    // }
+
     let total = text.chars().count();
     for val in corpus_map.values_mut() {
         *val /= total as f64;
@@ -19,7 +23,21 @@ fn create_corpus(text: String) -> HashMap<char, f64> {
     corpus_map
 }
 
-pub fn get_score_of_english_chars(text: String, corpus: &HashMap<char, f64>) -> f64 {
+pub fn get_uppercase_corpus() -> HashMap<char, f64> {
+    let corpus = get_english_corpus();
+    let mut upper_corpus = HashMap::new();
+    for (k, v) in corpus {
+        if !k.is_uppercase() {
+            continue
+        }
+        *upper_corpus.entry(k).or_insert(0f64) += v;
+    }
+
+    upper_corpus
+}
+
+
+pub fn get_score_of_english_chars(text: &str, corpus: &HashMap<char, f64>) -> f64 {
     let mut score = 0.0f64;
     for c in text.chars() {
         if let Some(freq) = corpus.get(&c) {
@@ -27,7 +45,7 @@ pub fn get_score_of_english_chars(text: String, corpus: &HashMap<char, f64>) -> 
         }
     }
 
-    return score / text.chars().count() as f64;
+    score / text.chars().count() as f64
 }
 
 // For binary strings a and b the Hamming distance is equal to the number of ones (population count) in a XOR b
@@ -53,8 +71,7 @@ pub fn transpose(bytes: &[u8], chunk_size: usize) -> Vec<Vec<u8>> {
 
 #[cfg(test)]
 mod utils_test {
-    use crate::set_1::{hamming_distance, transpose};
-
+    use crate::utils::{hamming_distance, transpose};
 
 
     #[test]

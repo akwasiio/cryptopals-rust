@@ -6,8 +6,9 @@ use aes::Aes128;
 use aes::cipher::{BlockDecrypt, KeyInit};
 use aes::cipher::consts::U16;
 use aes::cipher::generic_array::GenericArray;
-use crate::set_1::utils::*;
-mod utils;
+
+use crate::utils::{get_english_corpus, get_score_of_english_chars, hamming_distance, transpose};
+
 mod tests;
 
 type Key = String;
@@ -17,7 +18,7 @@ pub fn fixed_xor(first: &[u8], second: &[u8]) -> Vec<u8> {
     first.iter().zip(second).map(|(f, s)| f ^ s).collect()
 }
 
-pub fn single_byte_xor(bytes: &[u8], corpus: &HashMap<char,  f64>) -> (u8, String) {
+pub fn single_byte_xor(bytes: &[u8], corpus: &HashMap<char, f64>) -> (u8, String) {
 
     // evaluate each output and choose the one with the best score (has the highest frequency of english chars)
     let mut best_score = 0.0;
@@ -28,13 +29,12 @@ pub fn single_byte_xor(bytes: &[u8], corpus: &HashMap<char,  f64>) -> (u8, Strin
         let key_bytes = vec![i; bytes.len()];
         let xor_res = fixed_xor(bytes, &key_bytes);
 
-        if let Ok(value) = String::from_utf8(xor_res) {
-            let score = get_score_of_english_chars(value.clone(), corpus);
-            if score > best_score {
-                best_score = score;
-                best_xor_res = value;
-                best_key = i;
-            }
+        let s: String = xor_res.iter().map(|c| *c as char).collect();
+        let score = get_score_of_english_chars(&s, corpus);
+        if score > best_score {
+            best_score = score;
+            best_xor_res = s;
+            best_key = i;
         }
     }
 
@@ -52,14 +52,14 @@ pub fn detect_single_char_xor() -> char {
     let mut char = ' ';
     let mut best_score = 0.0;
 
-    for i in 0_u8 ..= 255 {
+    for i in 0_u8..=255 {
         let k = vec![i; 60];
         for line in texts.lines() {
             let x = hex::decode(line).unwrap();
             let xord = fixed_xor(&x, &k);
 
             if let Ok(value) = String::from_utf8(xord) {
-                let score = get_score_of_english_chars(value, &corpus);
+                let score = get_score_of_english_chars(&value, &corpus);
                 if score > best_score {
                     best_score = score;
                     char = i as char;
@@ -117,7 +117,6 @@ pub fn break_repeating_key_xor(bytes: &[u8]) -> Key {
 
     String::from_utf8(res).unwrap()
 }
-
 
 
 pub fn decrypt_aes_ecb(key_stream: &[u8], text_stream: &[u8]) -> Vec<u8> {
