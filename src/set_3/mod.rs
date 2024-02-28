@@ -2,7 +2,11 @@
 
 mod tests;
 
-use std::fs;
+use std::{
+    fs, num,
+    thread::{self, sleep},
+    time::{Duration, Instant, SystemTime},
+};
 
 use crate::{
     set_1::{fixed_xor, single_byte_xor},
@@ -246,7 +250,10 @@ impl MersenneTwisterRNG {
         let index = self.n as usize;
         self.mt[0] = seed;
         for i in 1usize..index {
-            self.mt[i] = self.f.wrapping_mul(self.mt[i - 1] ^ (self.mt[i - 1] >> (self.w - 2))) + i as u32;
+            self.mt[i] = self
+                .f
+                .wrapping_mul(self.mt[i - 1] ^ (self.mt[i - 1] >> (self.w - 2)))
+                .wrapping_add(i as u32);
         }
     }
 
@@ -266,16 +273,56 @@ impl MersenneTwisterRNG {
     }
 
     fn twist(&mut self) {
-      for i in 0 .. self.n {
-        let x = (self.mt[i as usize] & self.upper_mask) + (self.mt[((i + 1) % self.n) as usize] & self.lower_mask);
-        let mut xa = x >> 1;
-        if x % 2 != 0 {
-          xa ^= self.a;
+        for i in 0..self.n {
+            let x = (self.mt[i as usize] & self.upper_mask)
+                + (self.mt[((i + 1) % self.n) as usize] & self.lower_mask);
+            let mut xa = x >> 1;
+            if x % 2 != 0 {
+                xa ^= self.a;
+            }
+
+            self.mt[i as usize] = self.mt[((i + self.m) % self.n) as usize] ^ xa
         }
 
-        self.mt[i as usize] = self.mt[((i + self.m) % self.n) as usize] ^ xa
-      }
+        self.index = 0
+    }
+}
 
-      self.index = 0
+fn mersenne_twister_with_timestamp_seed() -> (u32, u32) {
+    // wait a random number of seconds between 50 and 1000
+    let mut rng = thread_rng();
+    let duration = Duration::from_millis(rng.gen_range(40..1000));
+    sleep(duration);
+
+    let seed = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+    let mut mersenne = MersenneTwisterRNG::new(Some(seed as u32));
+    let num = mersenne.extract_number();
+
+    let duration = Duration::from_millis(rng.gen_range(40..1000));
+    sleep(duration);
+
+    (seed as u32, num)
+}
+
+/// goes back in time to find the seed.
+fn crack_mersenne_seed(generated_number: u32, actual_seed: u32) -> u32 {
+    let mut now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u32;
+
+    loop {
+        now -= 1;
+        println!("Now: {} secs\tActual Seed:{}", now, actual_seed);
+        let mut rng = MersenneTwisterRNG::new(Some(now));
+        let num = rng.extract_number();
+
+        if num == generated_number {
+            // return the seed.
+            return now;
+        }
     }
 }

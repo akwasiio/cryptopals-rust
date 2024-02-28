@@ -3,7 +3,7 @@ pub mod set_3_tests {
     use base64::{engine::general_purpose, Engine};
     use std::fs;
 
-    use crate::set_3::{break_fixed_nonce_ctr, use_ctr_mode, MersenneTwisterRNG, PaddingOracle, PaddingOracleAttacker};
+    use crate::set_3::{break_fixed_nonce_ctr, crack_mersenne_seed, mersenne_twister_with_timestamp_seed, use_ctr_mode, MersenneTwisterRNG, PaddingOracle, PaddingOracleAttacker};
 
     #[test]
     fn test_padding_oracle_attack() {
@@ -81,5 +81,12 @@ pub mod set_3_tests {
           let actual = rng.extract_number();
           assert_eq!(expected, actual)
         }
+    }
+
+    #[test]
+    fn test_mersenne_seed_cracker() {
+      let (expected_seed, generated_number) = mersenne_twister_with_timestamp_seed();
+      let actual_seed = crack_mersenne_seed(generated_number, expected_seed);
+      assert_eq!(expected_seed, actual_seed)
     }
 }
